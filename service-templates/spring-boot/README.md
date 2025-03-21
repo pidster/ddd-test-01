@@ -1,127 +1,168 @@
-# Spring Boot Service Template
+# Spring Boot Service Template for Insurance Claims System
 
-This template provides a starting point for creating new microservices within the Insurance Claim Processing System, following Domain-Driven Design principles.
+This template provides a starting point for creating microservices within the Insurance Claims System, following Domain-Driven Design principles and best practices.
 
 ## Features
 
 - **Hexagonal Architecture**: Clear separation between domain, application, and infrastructure layers
-- **Domain-Driven Design**: Support for DDD concepts like aggregates, entities, value objects, and domain events
-- **Event-Driven**: Kafka integration for publishing and consuming domain events
-- **Database**: PostgreSQL with Flyway migrations for schema management
+- **Domain-Driven Design**: Entity, Value Object, Aggregate, Repository, and Domain Service patterns
+- **Event-Driven Architecture**: Domain events and Kafka integration
+- **Spring Boot**: Modern Spring Boot application with Spring Data JPA, Spring Security, and more
 - **API Documentation**: OpenAPI/Swagger integration
-- **Security**: OAuth2/JWT-based authentication and authorization
-- **Monitoring**: Spring Boot Actuator and Prometheus metrics
-- **Testing**: Comprehensive testing setup with JUnit, Mockito, and TestContainers
+- **Monitoring**: Actuator endpoints and Prometheus integration
+- **Testing**: Comprehensive testing with JUnit, Mockito, and TestContainers
+- **Database Migration**: Flyway for database schema management
+- **Security**: OAuth2/JWT authentication and authorization
 
 ## Project Structure
 
 ```
-src/main/java/com/insurance/service/
-├── adapter/
-│   └── rest/           # REST controllers (primary adapters)
-├── application/        # Application services, DTOs, and command/query handlers
-├── config/             # Application configuration
-├── domain/             # Domain model and business logic
-│   ├── model/          # Aggregates, entities, and value objects
-│   ├── service/        # Domain services
-│   ├── event/          # Domain events
-│   └── exception/      # Domain exceptions
-└── infrastructure/     # Infrastructure concerns (secondary adapters)
-    ├── persistence/    # Repository implementations
-    ├── messaging/      # Event publishing/subscription
-    └── client/         # Client code for other services
+src/
+├── main/
+│   ├── java/
+│   │   └── com/
+│   │       └── insurance/
+│   │           └── service/
+│   │               ├── adapter/           # Adapters for external systems
+│   │               │   └── rest/          # REST API controllers
+│   │               ├── application/       # Application services
+│   │               ├── config/            # Configuration classes
+│   │               ├── domain/            # Domain model
+│   │               │   ├── event/         # Domain events
+│   │               │   ├── exception/     # Domain exceptions
+│   │               │   ├── model/         # Entities, value objects, aggregates
+│   │               │   └── service/       # Domain services
+│   │               ├── infrastructure/    # Infrastructure components
+│   │               │   ├── client/        # External service clients
+│   │               │   ├── messaging/     # Messaging infrastructure
+│   │               │   └── persistence/   # Repository implementations
+│   │               └── ServiceApplication.java
+│   └── resources/
+│       ├── application.yml                # Application configuration
+│       └── db/
+│           └── migration/                 # Database migrations
+└── test/
+    ├── java/                              # Test classes
+    └── resources/                         # Test resources
 ```
 
 ## Getting Started
 
-1. **Clone the template**:
-   ```
-   cp -r service-templates/spring-boot services/my-new-service
-   ```
+### Prerequisites
 
-2. **Update package and service names**:
-   - Rename the package from `com.insurance.service` to `com.insurance.myservice`
-   - Update application name in `application.yml`
-   - Update service details in `pom.xml`
+- JDK 17 or later
+- Maven 3.8.x or later
+- Docker and Docker Compose (for local development)
 
-3. **Define your domain model**:
-   - Create aggregates in `domain/model/`
-   - Define domain events in `domain/event/`
-   - Implement domain services in `domain/service/`
+### Building the Project
 
-4. **Implement repositories**:
-   - Create repository interfaces in `domain/model/`
-   - Implement them in `infrastructure/persistence/`
+To build the project, run:
 
-5. **Create application services**:
-   - Implement application services in `application/`
-   - Define DTOs for API requests and responses
+```bash
+mvn clean install
+```
 
-6. **Add API endpoints**:
-   - Create REST controllers in `adapter/rest/`
-   - Document APIs with OpenAPI annotations
+To build without running tests:
+
+```bash
+mvn clean install -DskipTests
+```
+
+### Running the Application
+
+To run the application locally:
+
+```bash
+mvn spring-boot:run
+```
+
+Or with a specific profile:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+### Building a Docker Image
+
+A Dockerfile is included to build a container image:
+
+```bash
+docker build -t insurance-service:latest .
+```
+
+### Running with Docker Compose
+
+A Docker Compose file is provided to run the service with its dependencies:
+
+```bash
+docker-compose up -d
+```
 
 ## Development Guidelines
 
-### Domain Layer
+### Domain Model
 
 - Keep the domain model clean and free from infrastructure concerns
-- Use ubiquitous language from the domain in your code
-- Encapsulate business logic within aggregates and domain services
-- Make aggregates responsible for maintaining their invariants
+- Use value objects for concepts that don't have identity
+- Aggregate roots manage consistency boundaries
+- Domain events represent significant occurrences in the domain
 
-### Application Layer
+### Application Services
 
-- Application services should orchestrate domain objects and handle infrastructure concerns
-- Use DTOs for communication with external layers
-- Keep transaction management at this level
-- Publish domain events after successful transactions
+- Orchestrate domain objects to fulfill use cases
+- Handle transaction boundaries
+- Manage security concerns
+- Publish domain events
 
-### Infrastructure Layer
+### REST API
 
-- Implement repositories, event publishers, and external clients
-- Keep infrastructure details isolated from the domain
-- Use dependency injection to provide implementations to the application layer
+- Use RESTful principles
+- Version APIs appropriately
+- Document all endpoints with OpenAPI
+
+### Database Access
+
+- Use repositories to access data
+- Use Spring Data JPA for standard CRUD operations
+- Define custom queries for complex operations
+- Use specification pattern for dynamic queries
+
+### Messaging
+
+- Use Kafka for publishing and consuming events
+- Ensure proper error handling and retries
+- Use outbox pattern for reliable event publishing
 
 ## Testing
 
-- **Unit Tests**: Test domain logic in isolation
-- **Integration Tests**: Test repositories and infrastructure
-- **API Tests**: Test REST controllers and serialization
-- **End-to-End Tests**: Test complete flows
+### Unit Testing
 
-Run tests with:
-```
-./mvnw test
-```
+- Test domain logic in isolation
+- Use mocks for external dependencies
+- Focus on behavior, not implementation details
 
-Run integration tests with:
-```
-./mvnw verify -P integration-tests
-```
+### Integration Testing
 
-## Running Locally
+- Test interactions between components
+- Use TestContainers for database and Kafka integration tests
+- Test REST API endpoints with MockMvc
 
-1. Start infrastructure dependencies:
-   ```
-   docker-compose -f ../../infrastructure/docker/docker-compose.yml up -d
-   ```
+## Logging
 
-2. Run the application:
-   ```
-   ./mvnw spring-boot:run
-   ```
+- Use SLF4J for logging
+- Use appropriate log levels
+- Include context information in logs
 
-3. Access the API documentation:
-   ```
-   http://localhost:8080/swagger-ui.html
-   ```
+## Monitoring
 
-## Build and Deployment
+- Use Spring Boot Actuator for health checks and metrics
+- Expose Prometheus metrics
+- Set up alerts for critical service metrics
 
-Build a Docker image:
-```
-./mvnw spring-boot:build-image
-```
+## Additional Resources
 
-See the main documentation for details on deploying to Kubernetes. 
+- [Architecture Overview](../../ARCHITECTURE.md)
+- [Domain Model](../../ddd-domain-model.md)
+- [Bounded Contexts](../../ddd-bounded-contexts.md)
+- [Technical Design Document](../../docs/templates/technical-design-document-template.md)
+- [Code Style Guide](../../docs/code-style-guide.md) 

@@ -2,18 +2,20 @@ package com.insurance.service;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.openfeign.EnableFeignClients;
-import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 /**
- * Main Spring Boot application class for the service.
- * Enables Kafka for event-driven communication and Feign clients for inter-service communication.
+ * Main entry point for the Insurance Service application.
  */
 @SpringBootApplication
-@EnableKafka
-@EnableFeignClients
+@EnableJpaAuditing
 public class ServiceApplication {
 
+    /**
+     * Main method that starts the Spring Boot application.
+     *
+     * @param args Command line arguments
+     */
     public static void main(String[] args) {
         SpringApplication.run(ServiceApplication.class, args);
     }
