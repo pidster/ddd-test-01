@@ -69,35 +69,36 @@ Manages communication with customers.
 
 ```mermaid
 sequenceDiagram
-    actor System
     actor Customer
     actor Administrator
     actor ClaimsRep
+    participant System
     
-    Customer->>+System: Submit Claim
-    System-->>-Customer: ClaimSubmitted
+    Customer->>System: Submit Claim
+    System-->>Customer: ClaimSubmitted
     
-    Administrator->>+System: Check Documentation
-    System-->>-Administrator: ClaimRegistered
+    Administrator->>System: Check Documentation
+    System-->>Administrator: ClaimRegistered
     
-    ClaimsRep->>+System: Check Insurance
-    System-->>-ClaimsRep: AssessmentPerformed
+    ClaimsRep->>System: Check Insurance
+    System-->>ClaimsRep: AssessmentPerformed
     
     alt Claim Accepted
-        ClaimsRep->>+System: Accept Claim & Schedule Payment
-        System-->>-ClaimsRep: PaymentScheduled
+        ClaimsRep->>System: Accept Claim & Schedule Payment
+        System-->>ClaimsRep: PaymentScheduled
         
-        System->>+System: Perform Payment
-        System-->>-System: PaymentPerformed
+        Note over System: Internal Process
+        System->>System: Perform Payment
+        Note over System: Payment Performed
         
-        System->>+Customer: Notify Customer
-        System-->>-Customer: CustomerNotified
+        System->>Customer: Notify Customer
+        Note over Customer: CustomerNotified
     else Claim Rejected
-        ClaimsRep->>+System: Reject Claim
-        System-->>-ClaimsRep: ClaimRejected
+        ClaimsRep->>System: Reject Claim
+        System-->>ClaimsRep: ClaimRejected
         
-        System->>+Customer: Notify Customer
-        System-->>-Customer: CustomerNotified
+        System->>Customer: Notify Customer
+        Note over Customer: CustomerNotified
     end
 ```
 
