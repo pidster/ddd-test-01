@@ -69,6 +69,7 @@ Manages communication with customers.
 
 ```mermaid
 sequenceDiagram
+    actor System
     actor Customer
     actor Administrator
     actor ClaimsRep
