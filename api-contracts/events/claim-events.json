@@ -1,0 +1,365 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Claim Events Schema",
+  "description": "Schema definitions for claim-related events in the insurance claim system",
+  "definitions": {
+    "ClaimSubmittedEvent": {
+      "type": "object",
+      "description": "Event emitted when a claim is submitted",
+      "required": [
+        "eventId",
+        "eventType",
+        "timestamp",
+        "claimId",
+        "policyId",
+        "customerId",
+        "incidentDate",
+        "submissionDate"
+      ],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the event"
+        },
+        "eventType": {
+          "type": "string",
+          "enum": ["ClaimSubmitted"],
+          "description": "Type of the event"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time when the event was created"
+        },
+        "version": {
+          "type": "string",
+          "default": "1.0",
+          "description": "Event schema version"
+        },
+        "claimId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the claim"
+        },
+        "claimNumber": {
+          "type": "string",
+          "description": "Human-readable claim number"
+        },
+        "policyId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the policy under which the claim is submitted"
+        },
+        "customerId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the customer who submitted the claim"
+        },
+        "incidentDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Date when the incident occurred"
+        },
+        "submissionDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Date and time when the claim was submitted"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the incident"
+        },
+        "estimatedAmount": {
+          "type": "number",
+          "description": "Estimated claim amount"
+        },
+        "submissionChannel": {
+          "type": "string",
+          "enum": ["WEB", "MOBILE", "MAIL", "PHONE"],
+          "description": "Channel through which the claim was submitted"
+        }
+      }
+    },
+    "ClaimRegisteredEvent": {
+      "type": "object",
+      "description": "Event emitted when a claim is registered after document verification",
+      "required": [
+        "eventId",
+        "eventType",
+        "timestamp",
+        "claimId",
+        "registrationDate",
+        "isDocumentationComplete"
+      ],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the event"
+        },
+        "eventType": {
+          "type": "string",
+          "enum": ["ClaimRegistered"],
+          "description": "Type of the event"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time when the event was created"
+        },
+        "version": {
+          "type": "string",
+          "default": "1.0",
+          "description": "Event schema version"
+        },
+        "claimId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the claim"
+        },
+        "claimNumber": {
+          "type": "string",
+          "description": "Human-readable claim number"
+        },
+        "registrationDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Date and time when the claim was registered"
+        },
+        "isDocumentationComplete": {
+          "type": "boolean",
+          "description": "Whether all required documentation is complete"
+        },
+        "registrationNotes": {
+          "type": "string",
+          "description": "Notes about the registration"
+        },
+        "registeredBy": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the administrator who registered the claim"
+        }
+      }
+    },
+    "AssessmentPerformedEvent": {
+      "type": "object",
+      "description": "Event emitted when a claim assessment is performed",
+      "required": [
+        "eventId",
+        "eventType",
+        "timestamp",
+        "claimId",
+        "assessmentDate",
+        "coveredByPolicy",
+        "recommendedAction"
+      ],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the event"
+        },
+        "eventType": {
+          "type": "string",
+          "enum": ["AssessmentPerformed"],
+          "description": "Type of the event"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time when the event was created"
+        },
+        "version": {
+          "type": "string",
+          "default": "1.0",
+          "description": "Event schema version"
+        },
+        "claimId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the claim"
+        },
+        "claimNumber": {
+          "type": "string",
+          "description": "Human-readable claim number"
+        },
+        "assessmentDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Date and time when the claim was assessed"
+        },
+        "coveredByPolicy": {
+          "type": "boolean",
+          "description": "Whether the claim is covered by the policy"
+        },
+        "recommendedAction": {
+          "type": "string",
+          "enum": ["ACCEPT", "REJECT", "ADDITIONAL_INFO"],
+          "description": "Recommended action based on assessment"
+        },
+        "assessmentNotes": {
+          "type": "string",
+          "description": "Notes from the assessment"
+        },
+        "assessedBy": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the claims representative who performed the assessment"
+        }
+      }
+    },
+    "ClaimAcceptedEvent": {
+      "type": "object",
+      "description": "Event emitted when a claim is accepted",
+      "required": [
+        "eventId",
+        "eventType",
+        "timestamp",
+        "claimId",
+        "acceptanceDate",
+        "approvedAmount"
+      ],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the event"
+        },
+        "eventType": {
+          "type": "string",
+          "enum": ["ClaimAccepted"],
+          "description": "Type of the event"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time when the event was created"
+        },
+        "version": {
+          "type": "string",
+          "default": "1.0",
+          "description": "Event schema version"
+        },
+        "claimId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the claim"
+        },
+        "claimNumber": {
+          "type": "string",
+          "description": "Human-readable claim number"
+        },
+        "policyId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the policy"
+        },
+        "customerId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the customer"
+        },
+        "acceptanceDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Date and time when the claim was accepted"
+        },
+        "approvedAmount": {
+          "type": "number",
+          "format": "double",
+          "description": "Approved payment amount"
+        },
+        "acceptanceNotes": {
+          "type": "string",
+          "description": "Notes explaining the acceptance decision"
+        },
+        "acceptedBy": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the claims representative who accepted the claim"
+        }
+      }
+    },
+    "ClaimRejectedEvent": {
+      "type": "object",
+      "description": "Event emitted when a claim is rejected",
+      "required": [
+        "eventId",
+        "eventType",
+        "timestamp",
+        "claimId",
+        "rejectionDate",
+        "rejectionReason"
+      ],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the event"
+        },
+        "eventType": {
+          "type": "string",
+          "enum": ["ClaimRejected"],
+          "description": "Type of the event"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time when the event was created"
+        },
+        "version": {
+          "type": "string",
+          "default": "1.0",
+          "description": "Event schema version"
+        },
+        "claimId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for the claim"
+        },
+        "claimNumber": {
+          "type": "string",
+          "description": "Human-readable claim number"
+        },
+        "policyId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the policy"
+        },
+        "customerId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the customer"
+        },
+        "rejectionDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Date and time when the claim was rejected"
+        },
+        "rejectionReason": {
+          "type": "string",
+          "enum": ["NOT_COVERED", "FRAUDULENT", "INCOMPLETE_DOCUMENTATION", "POLICY_EXPIRED", "OTHER"],
+          "description": "Reason for rejecting the claim"
+        },
+        "rejectionNotes": {
+          "type": "string",
+          "description": "Notes explaining the rejection decision"
+        },
+        "rejectedBy": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the claims representative who rejected the claim"
+        }
+      }
+    }
+  },
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/definitions/ClaimSubmittedEvent" },
+    { "$ref": "#/definitions/ClaimRegisteredEvent" },
+    { "$ref": "#/definitions/AssessmentPerformedEvent" },
+    { "$ref": "#/definitions/ClaimAcceptedEvent" },
+    { "$ref": "#/definitions/ClaimRejectedEvent" }
+  ]
+} 

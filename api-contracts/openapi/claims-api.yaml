@@ -1,0 +1,724 @@
+openapi: 3.0.3
+info:
+  title: Claims Service API
+  description: API for managing insurance claims in the Claims Processing Context
+  version: 1.0.0
+  contact:
+    name: Insurance Engineering Team
+    email: engineering@insurance-company.com
+
+servers:
+  - url: 'https://api.insurance-company.com/claims/v1'
+    description: Production server
+  - url: 'https://api-dev.insurance-company.com/claims/v1'
+    description: Development server
+
+tags:
+  - name: claims
+    description: Operations related to insurance claims
+  - name: documents
+    description: Operations for managing claim documents
+  - name: assessment
+    description: Operations for claim assessment
+
+paths:
+  /claims:
+    post:
+      tags:
+        - claims
+      summary: Submit a new claim
+      description: Submits a new insurance claim into the system
+      operationId: submitClaim
+      requestBody:
+        description: Claim submission data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimSubmissionRequest'
+      responses:
+        '201':
+          description: Claim successfully submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - bearerAuth: []
+    
+    get:
+      tags:
+        - claims
+      summary: List claims
+      description: Retrieves a paginated list of claims with optional filtering
+      operationId: listClaims
+      parameters:
+        - name: status
+          in: query
+          description: Filter claims by status
+          schema:
+            type: string
+            enum: [SUBMITTED, REGISTERED, ASSESSED, ACCEPTED, REJECTED]
+        - name: customerId
+          in: query
+          description: Filter claims by customer ID
+          schema:
+            type: string
+            format: uuid
+        - name: policyId
+          in: query
+          description: Filter claims by policy ID
+          schema:
+            type: string
+            format: uuid
+        - name: dateFrom
+          in: query
+          description: Filter claims submitted after this date
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          description: Filter claims submitted before this date
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          description: Page number (0-based)
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          description: Page size
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - bearerAuth: []
+
+  /claims/{claimId}:
+    get:
+      tags:
+        - claims
+      summary: Get claim details
+      description: Retrieves detailed information for a specific claim
+      operationId: getClaimDetails
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          description: ID of the claim to retrieve
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - bearerAuth: []
+
+  /claims/{claimId}/register:
+    put:
+      tags:
+        - claims
+      summary: Register a claim
+      description: Registers a submitted claim after document verification
+      operationId: registerClaim
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          description: ID of the claim to register
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Registration details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimRegistrationRequest'
+      responses:
+        '200':
+          description: Claim successfully registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Claim not in a valid state for registration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - bearerAuth: []
+
+  /claims/{claimId}/assess:
+    put:
+      tags:
+        - assessment
+      summary: Assess a claim
+      description: Performs assessment on a registered claim
+      operationId: assessClaim
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          description: ID of the claim to assess
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Assessment details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimAssessmentRequest'
+      responses:
+        '200':
+          description: Claim successfully assessed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Claim not in a valid state for assessment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - bearerAuth: []
+
+  /claims/{claimId}/accept:
+    put:
+      tags:
+        - assessment
+      summary: Accept a claim
+      description: Accepts an assessed claim
+      operationId: acceptClaim
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          description: ID of the claim to accept
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Acceptance details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimAcceptanceRequest'
+      responses:
+        '200':
+          description: Claim successfully accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Claim not in a valid state for acceptance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - bearerAuth: []
+
+  /claims/{claimId}/reject:
+    put:
+      tags:
+        - assessment
+      summary: Reject a claim
+      description: Rejects an assessed claim
+      operationId: rejectClaim
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          description: ID of the claim to reject
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: Rejection details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimRejectionRequest'
+      responses:
+        '200':
+          description: Claim successfully rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Claim not in a valid state for rejection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - bearerAuth: []
+
+  /claims/{claimId}/documents:
+    post:
+      tags:
+        - documents
+      summary: Upload claim documents
+      description: Uploads documents related to a claim
+      operationId: uploadClaimDocuments
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          description: ID of the claim to upload documents for
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                documentType:
+                  type: string
+                  enum: [INVOICE, PHOTO, POLICE_REPORT, MEDICAL_REPORT, OTHER]
+                description:
+                  type: string
+                  maxLength: 255
+                file:
+                  type: string
+                  format: binary
+              required:
+                - documentType
+                - file
+      responses:
+        '201':
+          description: Document successfully uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          description: File size too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported file type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - bearerAuth: []
+    
+    get:
+      tags:
+        - documents
+      summary: List claim documents
+      description: Lists all documents associated with a claim
+      operationId: listClaimDocuments
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          description: ID of the claim to list documents for
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - bearerAuth: []
+
+components:
+  schemas:
+    ClaimSubmissionRequest:
+      type: object
+      required:
+        - policyId
+        - incidentDate
+        - description
+      properties:
+        policyId:
+          type: string
+          format: uuid
+          description: ID of the policy under which the claim is being submitted
+        incidentDate:
+          type: string
+          format: date
+          description: Date when the incident occurred
+        description:
+          type: string
+          maxLength: 1000
+          description: Description of the incident and damage
+        estimatedAmount:
+          type: number
+          format: double
+          description: Estimated claim amount
+        incidentLocation:
+          type: string
+          maxLength: 255
+          description: Location where the incident occurred
+        submissionChannel:
+          type: string
+          enum: [WEB, MOBILE, MAIL, PHONE]
+          description: Channel through which the claim is submitted
+
+    ClaimRegistrationRequest:
+      type: object
+      required:
+        - isDocumentationComplete
+      properties:
+        isDocumentationComplete:
+          type: boolean
+          description: Indicates if all required documentation is complete
+        registrationNotes:
+          type: string
+          maxLength: 500
+          description: Administrator notes about the registration
+
+    ClaimAssessmentRequest:
+      type: object
+      required:
+        - coveredByPolicy
+      properties:
+        coveredByPolicy:
+          type: boolean
+          description: Indicates if the claim is covered by the policy
+        assessmentNotes:
+          type: string
+          maxLength: 1000
+          description: Notes from the claim assessment
+        recommendedAction:
+          type: string
+          enum: [ACCEPT, REJECT, ADDITIONAL_INFO]
+          description: Recommended action based on assessment
+
+    ClaimAcceptanceRequest:
+      type: object
+      required:
+        - approvedAmount
+      properties:
+        approvedAmount:
+          type: number
+          format: double
+          description: Approved payment amount
+        acceptanceNotes:
+          type: string
+          maxLength: 500
+          description: Notes explaining the acceptance decision
+
+    ClaimRejectionRequest:
+      type: object
+      required:
+        - rejectionReason
+      properties:
+        rejectionReason:
+          type: string
+          enum: [NOT_COVERED, FRAUDULENT, INCOMPLETE_DOCUMENTATION, POLICY_EXPIRED, OTHER]
+          description: Reason for rejecting the claim
+        rejectionNotes:
+          type: string
+          maxLength: 500
+          description: Notes explaining the rejection decision
+
+    ClaimResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the claim
+        claimNumber:
+          type: string
+          description: Human-readable claim number
+        policyId:
+          type: string
+          format: uuid
+          description: ID of the policy under which the claim is submitted
+        customerId:
+          type: string
+          format: uuid
+          description: ID of the customer who submitted the claim
+        status:
+          type: string
+          enum: [SUBMITTED, REGISTERED, ASSESSED, ACCEPTED, REJECTED]
+          description: Current status of the claim
+        submissionDate:
+          type: string
+          format: date-time
+          description: Date and time when the claim was submitted
+        incidentDate:
+          type: string
+          format: date
+          description: Date when the incident occurred
+        description:
+          type: string
+          description: Description of the incident and damage
+        estimatedAmount:
+          type: number
+          format: double
+          description: Estimated claim amount
+        approvedAmount:
+          type: number
+          format: double
+          description: Approved payment amount (if accepted)
+        rejectionReason:
+          type: string
+          enum: [NOT_COVERED, FRAUDULENT, INCOMPLETE_DOCUMENTATION, POLICY_EXPIRED, OTHER]
+          description: Reason for rejection (if rejected)
+        assessmentNotes:
+          type: string
+          description: Notes from the assessment
+        documentsCount:
+          type: integer
+          description: Number of documents attached to the claim
+        lastUpdatedDate:
+          type: string
+          format: date-time
+          description: Date and time when the claim was last updated
+
+    ClaimPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimResponse'
+        page:
+          type: integer
+          description: Current page number
+        size:
+          type: integer
+          description: Page size
+        totalElements:
+          type: integer
+          description: Total number of elements across all pages
+        totalPages:
+          type: integer
+          description: Total number of pages
+
+    DocumentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the document
+        claimId:
+          type: string
+          format: uuid
+          description: ID of the claim this document belongs to
+        documentType:
+          type: string
+          enum: [INVOICE, PHOTO, POLICE_REPORT, MEDICAL_REPORT, OTHER]
+          description: Type of document
+        description:
+          type: string
+          description: Document description
+        fileName:
+          type: string
+          description: Original file name
+        fileSize:
+          type: integer
+          description: File size in bytes
+        mimeType:
+          type: string
+          description: MIME type of the file
+        uploadDate:
+          type: string
+          format: date-time
+          description: Date and time when the document was uploaded
+        downloadUrl:
+          type: string
+          description: URL to download the document
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Time when the error occurred
+        status:
+          type: integer
+          description: HTTP status code
+        error:
+          type: string
+          description: Error type
+        message:
+          type: string
+          description: Error message
+        path:
+          type: string
+          description: Request path that produced the error
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Field with error (if applicable)
+              message:
+                type: string
+                description: Specific error message for this field
+              value:
+                type: string
+                description: Value that caused the error
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT 

@@ -1,0 +1,263 @@
+name: Deploy to Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - test
+          - staging
+          - prod
+      version:
+        description: 'Version to deploy'
+        required: true
+        type: string
+
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      version: ${{ steps.set-version.outputs.version }}
+    steps:
+      - id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "push" ] && [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          fi
+
+      - id: set-version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "push" ] && [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "version=latest" >> $GITHUB_OUTPUT
+          fi
+
+  build-services:
+    needs: setup
+    runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push services
+        run: |
+          cd services
+          
+          VERSION=${{ needs.setup.outputs.version }}
+          REGISTRY="your-registry"
+          
+          for service in */; do
+            SERVICE_NAME=$(basename $service)
+            echo "Building $SERVICE_NAME..."
+            
+            # Build the service JAR
+            ./mvnw -pl $SERVICE_NAME clean package -DskipTests
+            
+            # Build and push Docker image
+            docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --push \
+              -t $REGISTRY/$SERVICE_NAME:$VERSION \
+              -t $REGISTRY/$SERVICE_NAME:latest \
+              $SERVICE_NAME
+          done
+
+  build-frontend:
+    needs: setup
+    runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+        env:
+          REACT_APP_API_URL: ${{ secrets.API_URL }}
+          REACT_APP_ENVIRONMENT: ${{ needs.setup.outputs.environment }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            your-registry/frontend:${{ needs.setup.outputs.version }}
+            your-registry/frontend:latest
+
+  deploy:
+    needs: [setup, build-services, build-frontend]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v3
+        
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+          
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+          
+      - name: Configure Kubernetes credentials
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+          
+      - name: Update Helm values
+        run: |
+          # Create environment-specific values file
+          cat > values-${{ needs.setup.outputs.environment }}.yaml << EOF
+          environment: ${{ needs.setup.outputs.environment }}
+          version: ${{ needs.setup.outputs.version }}
+          
+          services:
+            claims:
+              image: your-registry/claims-service:${{ needs.setup.outputs.version }}
+            policy:
+              image: your-registry/policy-service:${{ needs.setup.outputs.version }}
+            payment:
+              image: your-registry/payment-service:${{ needs.setup.outputs.version }}
+            notification:
+              image: your-registry/notification-service:${{ needs.setup.outputs.version }}
+              
+          frontend:
+            image: your-registry/frontend:${{ needs.setup.outputs.version }}
+            
+          ingress:
+            host: insurance-${{ needs.setup.outputs.environment }}.example.com
+          EOF
+          
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install insurance-system ./infrastructure/helm \
+            --namespace insurance-${{ needs.setup.outputs.environment }} \
+            --create-namespace \
+            -f values-${{ needs.setup.outputs.environment }}.yaml
+            
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/claims-service -n insurance-${{ needs.setup.outputs.environment }} --timeout=300s
+          kubectl rollout status deployment/policy-service -n insurance-${{ needs.setup.outputs.environment }} --timeout=300s
+          kubectl rollout status deployment/payment-service -n insurance-${{ needs.setup.outputs.environment }} --timeout=300s
+          kubectl rollout status deployment/notification-service -n insurance-${{ needs.setup.outputs.environment }} --timeout=300s
+          kubectl rollout status deployment/frontend -n insurance-${{ needs.setup.outputs.environment }} --timeout=300s
+  
+  post-deploy:
+    needs: [setup, deploy]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.environment }}
+    if: success()
+    steps:
+      - name: Run database migrations
+        run: |
+          # Using k8s job to run migrations
+          cat <<EOF | kubectl apply -f -
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: db-migrations-${{ needs.setup.outputs.version }}
+            namespace: insurance-${{ needs.setup.outputs.environment }}
+          spec:
+            ttlSecondsAfterFinished: 3600
+            template:
+              spec:
+                containers:
+                - name: db-migrations
+                  image: your-registry/db-migrations:${{ needs.setup.outputs.version }}
+                  env:
+                  - name: DB_URL
+                    valueFrom:
+                      secretKeyRef:
+                        name: db-credentials
+                        key: url
+                  - name: DB_USER
+                    valueFrom:
+                      secretKeyRef:
+                        name: db-credentials
+                        key: username
+                  - name: DB_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: db-credentials
+                        key: password
+                restartPolicy: Never
+            backoffLimit: 3
+          EOF
+          
+          # Wait for the migration job to complete
+          kubectl wait --for=condition=complete --timeout=300s \
+            job/db-migrations-${{ needs.setup.outputs.version }} \
+            -n insurance-${{ needs.setup.outputs.environment }}
+          
+      - name: Send deployment notification
+        if: always()
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Deployment Status: ${{ job.status }}\nEnvironment: ${{ needs.setup.outputs.environment }}\nVersion: ${{ needs.setup.outputs.version }}\nDeployed by: ${{ github.actor }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} 

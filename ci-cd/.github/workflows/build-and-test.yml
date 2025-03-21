@@ -1,0 +1,272 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Cache Maven packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    - name: Verify Project
+      run: |
+        cd services
+        ./mvnw clean verify -B
+
+    - name: Run Tests with Coverage
+      run: |
+        cd services
+        ./mvnw test jacoco:report -B
+
+    - name: SonarQube Analysis
+      if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+      run: |
+        cd services
+        ./mvnw sonar:sonar -B \
+          -Dsonar.projectKey=insurance-claim-system \
+          -Dsonar.host.url=${{ secrets.SONAR_URL }} \
+          -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+          -Dsonar.java.coveragePlugin=jacoco
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build Services
+      run: |
+        cd services
+        ./mvnw package -DskipTests -B
+
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: '**/target/surefire-reports/*.xml'
+
+    - name: Upload Coverage Reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: '**/target/site/jacoco'
+
+  integration-tests:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: insurance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      kafka:
+        image: confluentinc/cp-kafka:7.3.0
+        env:
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+          KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_BROKER_ID: 1
+        ports:
+          - 9092:9092
+
+      zookeeper:
+        image: confluentinc/cp-zookeeper:7.3.0
+        env:
+          ZOOKEEPER_CLIENT_PORT: 2181
+          ZOOKEEPER_TICK_TIME: 2000
+        ports:
+          - 2181:2181
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Run Integration Tests
+      run: |
+        cd services
+        ./mvnw verify -P integration-tests -DskipUnitTests -B
+
+    - name: Upload Integration Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: integration-test-results
+        path: '**/target/failsafe-reports/*.xml'
+
+  api-compatibility:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Validate OpenAPI Specs
+      run: |
+        # Install Spectral OpenAPI linter
+        npm install -g @stoplight/spectral-cli
+        
+        # Validate all OpenAPI specs
+        for file in api-contracts/openapi/*.yaml; do
+          echo "Validating $file"
+          spectral lint $file --ruleset https://unpkg.com/@stoplight/spectral-rulesets@1.16.0/dist/openapi-3.0.yaml
+        done
+
+    - name: Check for Breaking API Changes
+      run: |
+        # Install OpenAPI diff tool
+        npm install -g @openapitools/openapi-diff
+
+        # Get the base branch name
+        if [[ $GITHUB_EVENT_NAME == 'pull_request' ]]; then
+          BASE_BRANCH=${{ github.event.pull_request.base.ref }}
+        else
+          BASE_BRANCH='develop'
+        fi
+
+        # Checkout base branch to compare
+        git fetch origin $BASE_BRANCH
+        git checkout FETCH_HEAD -- api-contracts/openapi/
+
+        # Move base branch specs to a temp directory
+        mkdir -p temp/base
+        cp api-contracts/openapi/*.yaml temp/base/
+
+        # Checkout current branch specs
+        git checkout ${{ github.sha }} -- api-contracts/openapi/
+
+        # Compare specs
+        for file in api-contracts/openapi/*.yaml; do
+          filename=$(basename "$file")
+          if [ -f "temp/base/$filename" ]; then
+            echo "Checking for breaking changes in $filename"
+            openapi-diff temp/base/$filename $file --fail-on-breaking-changes || exit 1
+          else
+            echo "New API spec: $filename"
+          fi
+        done
+
+  security-scan:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Run OWASP Dependency Check
+      run: |
+        cd services
+        ./mvnw dependency-check:check -B
+
+    - name: Upload Dependency Check Reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: dependency-check-reports
+        path: '**/target/dependency-check-report.html'
+
+    - name: Run Security Code Scan
+      run: |
+        cd services
+        ./mvnw verify -P security-checks -B
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Run ESLint
+      run: |
+        cd frontend
+        npm run lint
+
+    - name: Run TypeScript checks
+      run: |
+        cd frontend
+        npm run type-check
+
+    - name: Run Tests
+      run: |
+        cd frontend
+        npm test -- --coverage
+
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: frontend-test-results
+        path: frontend/coverage
+
+    - name: Upload Build
+      uses: actions/upload-artifact@v3
+      with:
+        name: frontend-build
+        path: frontend/build 
